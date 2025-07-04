@@ -29,54 +29,60 @@ values('159103036','PO1496')
 select * from SubjectRequest
 
 --QUERY creation 
-alter PROCEDURE proc_SubjectRequests
+GO
+CREATE PROCEDURE proc_SubjectRequests
 AS
 BEGIN
-	DECLARE @StudentID VARCHAR(50);
-	DECLARE @NewSubjectID VARCHAR(50);
-	DECLARE @CurrentSubjectID VARCHAR(50);
+    DECLARE @StudentID VARCHAR(50);
+    DECLARE @NewSubjectID VARCHAR(50);
+    DECLARE @CurrentSubjectID VARCHAR(50);
 
-	DECLARE request_cursor CURSOR FOR
-	SELECT StudentID, SubjectID
-	from SubjectRequest
+    DECLARE request_cursor CURSOR FOR
+        SELECT StudentID, SubjectID FROM SubjectRequest;
 
-	OPEN request_cursor
-		FETCH NEXT FROM request_cursor INTO @StudentID, @NewSubjectID;
+    OPEN request_cursor;
 
-		WHILE @@FETCH_STATUS=0
-		BEGIN
-			SELECT @CurrentSubjectID=SubjectID
-			FROM SubjectAllotments
-			WHERE @StudentID=StudentID AND Is_Valid=1
+    FETCH NEXT FROM request_cursor INTO @StudentID, @NewSubjectID;
 
-			--If no subjectc is alloted then 
-			IF @CurrentSubjectID=null
-			BEGIN
-				INSERT INTO SubjectAllotments(StudentID, SubjectID, Is_valid)
-				VALUES (@StudentID, @newSubjectID, 1)
-			END
-			ELSE
-			BEGIN 
-				IF @currentsubjectID<>@newSubjectID
-				BEGIN
-					UPDATE SubjectAllotments
-					SET is_valid = 0 
-					WHERE @StudentID=StudentID AND @CurrentSubjectID=SubjectID
-					
-					--insert new subject as current
-					INSERT INTO SubjectAllotments(StudentID, SubjectID, Is_valid)
-					VALUES(@StudentID,@NewSubjectID,1)
-				END
-			END
-			FETCH NEXT FROM request_cursor INTO @studentID, @newSubjectID;
-		END
-		CLOSE request_cursor;
-		DEALLOCATE request_cursor;
-END
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Get currently valid subject
+        SELECT @CurrentSubjectID = SubjectID
+        FROM SubjectAllotments
+        WHERE StudentID = @StudentID AND Is_Valid = 1;
+
+        -- If no subject currently allotted
+        IF @CurrentSubjectID IS NULL
+        BEGIN
+            INSERT INTO SubjectAllotments (StudentID, SubjectID, Is_Valid)
+            VALUES (@StudentID, @NewSubjectID, 1);
+        END
+        ELSE
+        BEGIN
+            -- If different subject requested
+            IF @CurrentSubjectID <> @NewSubjectID
+            BEGIN
+                -- Invalidate the old subject
+                UPDATE SubjectAllotments
+                SET Is_Valid = 0
+                WHERE StudentID = @StudentID AND SubjectID = @CurrentSubjectID;
+
+                -- Insert new subject
+                INSERT INTO SubjectAllotments (StudentID, SubjectID, Is_Valid)
+                VALUES (@StudentID, @NewSubjectID, 1);
+            END
+        END
+
+        FETCH NEXT FROM request_cursor INTO @StudentID, @NewSubjectID;
+    END
+
+    CLOSE request_cursor;
+    DEALLOCATE request_cursor;
+END;
+
 
 --query execution 
 exec proc_SubjectRequests
 
 --testing the data
 select * from SubjectAllotments
---
